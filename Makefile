@@ -19,12 +19,13 @@ INC :=
 CPPFLAGS := $(INC) -MP -MMD
 
 WARN := -Wall
+WARN += -Wextra
 WARN += -Wdeclaration-after-statement
 WARN += -Werror
 CFLAGS := $(WARN) $(DEBUG)
 
 LDFLAGS := $(DEBUG)
-LDLIBS :=
+LDLIBS := -lplot -lgeos_c
 
 SRC := wktplot.c
 
