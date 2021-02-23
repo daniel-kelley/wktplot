@@ -146,7 +146,8 @@ static int w_handle_point(struct info *info, const GEOSGeometry *geom)
 static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
 {
     int err = 1;
-    //int n;
+    int n;
+    int i;
     const GEOSGeometry *g;
     double prev[2];
 
@@ -157,7 +158,16 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
         }
         w_iterate_coord_seq(info, g, w_line_iterator, prev);
 
-        //n = GEOSGetNumInteriorRings_r(info->handle, geom);
+        n = GEOSGetNumInteriorRings_r(info->handle, geom);
+
+        for (i=0; i<n; i++) {
+            g = GEOSGetInteriorRingN_r(info->handle, geom, i);
+            if (g==NULL) {
+                break;
+            }
+            w_iterate_coord_seq(info, g, w_line_iterator, prev);
+        }
+
     } while (0);
 
     return err;
