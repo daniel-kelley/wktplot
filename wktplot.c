@@ -41,12 +41,125 @@ struct info {
     GEOSContextHandle_t handle;
 };
 
-static int w_handle_point(struct info *info, const GEOSGeometry *geom)
+static int w_iterate_coord_seq(
+    struct info *info,
+    const GEOSGeometry *geom,
+    int (*handler)(struct info *, unsigned, unsigned, double, double, void *),
+    void *user_data)
 {
     int err = 1;
+    int rc;
+    unsigned int n;
+    unsigned int d;
+    unsigned int i;
+    const GEOSCoordSequence* s;
 
-    (void)info;
-    (void)geom;
+    do {
+        s = GEOSGeom_getCoordSeq_r(info->handle, geom);
+        if (s == NULL) {
+            break;
+        }
+
+        rc = GEOSCoordSeq_getSize_r(info->handle, s, &n);
+        if (!rc) {
+            break;
+        }
+
+        rc = GEOSCoordSeq_getDimensions_r(info->handle, s, &d);
+        if (!rc) {
+            break;
+        }
+
+        if (d != 2) {
+            fprintf(stderr, "Unsupported Point dimension %u\n", d);
+            break;
+        }
+
+        err = 0;
+
+        for (i=0; i<n; i++) {
+            double x;
+            double y;
+
+            rc = GEOSCoordSeq_getXY_r(info->handle, s, i, &x, &y);
+            if (!rc) {
+                err = 1;
+                break;
+            }
+            err = handler(info, i, n, x, y, user_data);
+            if (err) {
+                break;
+            }
+        }
+
+    } while (0);
+
+    return err;
+}
+
+static int w_point_iterator(
+    struct info *info,
+    unsigned i,
+    unsigned n,
+    double x,
+    double y,
+    void *user_data)
+{
+    (void)user_data;
+    if (info->verbose) {
+        fprintf(stderr, "Point %u/%u [%g,%g]\n", i, n, x, y);
+    }
+    pl_fpoint_r(info->plotter, x, y);
+
+    return 0;
+}
+
+static int w_line_iterator(
+    struct info *info,
+    unsigned i,
+    unsigned n,
+    double x,
+    double y,
+    void *user_data)
+{
+    double *prev = user_data;
+
+    if (info->verbose) {
+        fprintf(stderr, "Line %u/%u [%g,%g]\n", i, n, x, y);
+    }
+
+    if (i > 0) {
+        pl_fline_r(info->plotter, prev[0], prev[1], x, y);
+    }
+
+    prev[0] = x;
+    prev[1] = y;
+
+    return 0;
+}
+
+static int w_handle_point(struct info *info, const GEOSGeometry *geom)
+{
+    return w_iterate_coord_seq(info, geom, w_point_iterator, NULL);
+}
+
+static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
+{
+    int err = 1;
+    //int n;
+    const GEOSGeometry *g;
+    double prev[2];
+
+    do {
+        g = GEOSGetExteriorRing_r(info->handle, geom);
+        if (g==NULL) {
+            break;
+        }
+        w_iterate_coord_seq(info, g, w_line_iterator, prev);
+
+        //n = GEOSGetNumInteriorRings_r(info->handle, geom);
+    } while (0);
+
     return err;
 }
 
@@ -59,6 +172,8 @@ static int w_handle(struct info *info, const GEOSGeometry *geom)
 
     if (!strcmp(gtype, "Point")) {
         err = w_handle_point(info, geom);
+    } else if (!strcmp(gtype, "Polygon")) {
+        err = w_handle_polygon(info, geom);
     } else {
         fprintf(stderr,"Missing handler for %s\n", gtype);
     }
@@ -98,6 +213,10 @@ static int w_setup(struct info *info)
         rc = GEOSGeom_getYMax_r(info->handle, info->geom, &ymax);
         if (!rc) {
             break;
+        }
+
+        if (info->verbose) {
+            fprintf(stderr, "bounds: [%g,%g,%g,%g]\n",xmin,xmax,ymin,ymax);
         }
 
         err = 0;
@@ -340,12 +459,13 @@ int main(int argc, char *argv[])
     memset(&info, 0, sizeof(info));
     info.param = pl_newplparams();
     info.reader = READER_ASCII;
+    info.width = 0.1;
     assert(info.param != NULL);
 
     while ((c = getopt(argc, argv, "w:T:O:bBvh")) != EOF) {
         switch (c) {
         case 'w':
-            info.width = strtol(optarg,0,0);
+            info.width = strtod(optarg,0);
             break;
         case 'T':
             info.format = optarg;
