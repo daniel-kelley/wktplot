@@ -430,12 +430,23 @@ static int w_close(struct info *info)
 
 static int set_option(struct info *info, const char *arg)
 {
-    int err = 0;
-    /* set a Plotter parameter */
-    //err = pl_setplparam(info->param, "PAGESIZE", "letter");
+    int err = 1;
+    char *opt;
+    char *val;
 
-    (void)info;
-    (void)arg;
+    opt = strdup(arg);
+    assert(opt != NULL);
+    val = strchr(opt, '=');
+    if (val) {
+        *val++ = 0;
+        /* set a Plotter parameter */
+        err = pl_setplparam(info->param, opt, val);
+    } else {
+        fprintf(stderr, "Missing '=' in %s\n",arg);
+    }
+
+    free(opt);
+
     return err;
 }
 
@@ -460,6 +471,7 @@ int main(int argc, char *argv[])
     info.param = pl_newplparams();
     info.reader = READER_ASCII;
     info.width = 0.1;
+    info.format = "svg";
     assert(info.param != NULL);
 
     while ((c = getopt(argc, argv, "w:T:O:bBvh")) != EOF) {
