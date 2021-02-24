@@ -156,7 +156,11 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
         if (g==NULL) {
             break;
         }
-        w_iterate_coord_seq(info, g, w_line_iterator, prev);
+
+        err = w_iterate_coord_seq(info, g, w_line_iterator, prev);
+        if (err) {
+            break;
+        }
 
         n = GEOSGetNumInteriorRings_r(info->handle, geom);
 
@@ -165,10 +169,24 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
             if (g==NULL) {
                 break;
             }
-            w_iterate_coord_seq(info, g, w_line_iterator, prev);
+
+            err = w_iterate_coord_seq(info, g, w_line_iterator, prev);
+            if (err) {
+                break;
+            }
         }
 
     } while (0);
+
+    return err;
+}
+
+static int w_handle_linestring(struct info *info, const GEOSGeometry *geom)
+{
+    int err;
+    double prev[2];
+
+    err = w_iterate_coord_seq(info, geom, w_line_iterator, prev);
 
     return err;
 }
@@ -184,6 +202,8 @@ static int w_handle(struct info *info, const GEOSGeometry *geom)
         err = w_handle_point(info, geom);
     } else if (!strcmp(gtype, "Polygon")) {
         err = w_handle_polygon(info, geom);
+    } else if (!strcmp(gtype, "LineString")) {
+        err = w_handle_linestring(info, geom);
     } else {
         fprintf(stderr,"Missing handler for %s\n", gtype);
     }
