@@ -7,7 +7,7 @@
 
 #include "wkt.h"
 
-int wkt_open(struct wkt *wkt, const char *file)
+int wkt_open(struct wkt *wkt)
 {
     int err = 1;
 
@@ -18,48 +18,39 @@ int wkt_open(struct wkt *wkt, const char *file)
     }
 
     switch (wkt->reader) {
-    case WKT_READER_ASCII:
+    case WKT_IO_ASCII:
         wkt->wktr = GEOSWKTReader_create_r(wkt->handle);
         err = (wkt->wktr == NULL);
         break;
-    case WKT_READER_BINARY:
-    case WKT_READER_HEX:
+    case WKT_IO_BINARY:
+    case WKT_IO_HEX:
         wkt->wkbr = GEOSWKBReader_create_r(wkt->handle);
         err = (wkt->wkbr == NULL);
+        break;
+    case WKT_IO_NONE:
+        err = 0;
         break;
     default:
         err = 1;
         break;
     }
 
-    if (!err) {
-        err = wkt_snag(wkt, file);
-    }
-
     if (err) {
-        wkt->reader = WKT_READER_NONE;
+        return err;
     }
 
-    switch (wkt->reader) {
-    case WKT_READER_ASCII:
-        wkt->geom = GEOSWKTReader_read_r(wkt->handle, wkt->wktr, wkt->input);
-        err = (wkt->geom == NULL);
+    switch (wkt->writer) {
+    case WKT_IO_ASCII:
+        wkt->wktw = GEOSWKTWriter_create_r(wkt->handle);
+        err = (wkt->wktw == NULL);
         break;
-    case WKT_READER_BINARY:
-        wkt->geom = GEOSWKBReader_read_r(
-            wkt->handle,
-            wkt->wkbr,
-            (const unsigned char *)wkt->input,
-            wkt->input_len);
-        err = (wkt->geom == NULL);
+    case WKT_IO_BINARY:
+    case WKT_IO_HEX:
+        wkt->wkbw = GEOSWKBWriter_create_r(wkt->handle);
+        err = (wkt->wkbw == NULL);
         break;
-    case WKT_READER_HEX:
-        wkt->geom = GEOSWKBReader_readHEX_r(
-            wkt->handle,
-            wkt->wkbr,
-            (const unsigned char *)wkt->input,
-            wkt->input_len);
-        err = (wkt->geom == NULL);
+    case WKT_IO_NONE:
+        err = 0;
         break;
     default:
         err = 1;

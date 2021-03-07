@@ -19,6 +19,14 @@ int wkt_close(struct wkt *wkt)
         GEOSWKBReader_destroy_r(wkt->handle, wkt->wkbr);
     }
 
+    if (wkt->wktw) {
+        GEOSWKTWriter_destroy_r(wkt->handle, wkt->wktw);
+    }
+
+    if (wkt->wkbw) {
+        GEOSWKBWriter_destroy_r(wkt->handle, wkt->wkbw);
+    }
+
     GEOS_finish_r(wkt->handle);
 
     return err;

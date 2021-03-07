@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
 
     memset(&info, 0, sizeof(info));
     info.param = pl_newplparams();
-    info.wkt.reader = WKT_READER_ASCII;
+    info.wkt.reader = WKT_IO_ASCII;
     info.width = 0.1;
     info.format = "svg";
     assert(info.param != NULL);
@@ -313,10 +313,10 @@ int main(int argc, char *argv[])
             set_option(&info, optarg);
             break;
         case 'b':
-            info.wkt.reader = WKT_READER_BINARY;
+            info.wkt.reader = WKT_IO_BINARY;
             break;
         case 'B':
-            info.wkt.reader = WKT_READER_HEX;
+            info.wkt.reader = WKT_IO_HEX;
             break;
         case 'v':
             info.verbose = 1;
@@ -331,7 +331,10 @@ int main(int argc, char *argv[])
     }
 
     if (optind < argc) {
-        err = wkt_open(&info.wkt, argv[optind]);
+        err = wkt_open(&info.wkt);
+        if (!err) {
+            err = wkt_read(&info.wkt, argv[optind]);
+        }
         if (!err) {
             err = w_plot(&info);
         }

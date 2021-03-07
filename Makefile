@@ -31,6 +31,12 @@ WKTPLOT_DEP := $(WKTPLOT_SRC:%.c=%.d)
 OBJ := $(WKTPLOT_OBJ)
 DEP := $(WKTPLOT_DEP)
 
+WKTRAND_SRC := wktrand.c
+WKTRAND_OBJ := $(WKTRAND_SRC:%.c=%.o)
+WKTRAND_DEP := $(WKTRAND_SRC:%.c=%.d)
+OBJ += $(WKTRAND_OBJ)
+DEP += $(WKTRAND_DEP)
+
 LIBMAJOR := 0
 LIBMINOR := 1
 
@@ -40,24 +46,29 @@ SHLIBRARY := $(LIBNAME).so
 SHLIBRARY_VER := $(LIBNAME)-$(LIBMAJOR).$(LIBMINOR).so
 
 WKTLIB_SRC := wkt_open.c
+WKTLIB_SRC += wkt_read.c
 WKTLIB_SRC += wkt_snag.c
 WKTLIB_SRC += wkt_close.c
 WKTLIB_SRC += wkt_iterate_coord_seq.c
 WKTLIB_SRC += wkt_bounds.c
 WKTLIB_SRC += wkt_iterate.c
+WKTLIB_SRC += wkt_write.c
+WKTLIB_SRC += wkt_stash.c
 WKTLIB_LDLIBS := -lgeos_c
 WKTLIB_OBJ := $(WKTLIB_SRC:%.c=%.o)
 WKTLIB_DEP := $(WKTLIB_SRC:%.c=%.d)
 OBJ += $(WKTLIB_OBJ)
 DEP += $(WKTLIB_DEP)
 
-PROG := wktplot
+PROG := wktplot wktrand
 
 .PHONY: all install uninstall clean
 
 all: $(PROG) $(LIBRARY) $(SHLIBRARY)
 
 wktplot: $(WKTPLOT_SRC) $(SHLIBRARY)
+
+wktrand: $(WKTRAND_SRC) $(SHLIBRARY)
 
 $(LIBRARY): $(WKTLIB_OBJ)
 	$(AR) cr $@ $^
