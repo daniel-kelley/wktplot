@@ -44,6 +44,7 @@ WKTLIB_SRC += wkt_snag.c
 WKTLIB_SRC += wkt_close.c
 WKTLIB_SRC += wkt_iterate_coord_seq.c
 WKTLIB_SRC += wkt_bounds.c
+WKTLIB_SRC += wkt_iterate.c
 WKTLIB_LDLIBS := -lgeos_c
 WKTLIB_OBJ := $(WKTLIB_SRC:%.c=%.o)
 WKTLIB_DEP := $(WKTLIB_SRC:%.c=%.d)

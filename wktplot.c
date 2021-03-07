@@ -136,13 +136,15 @@ static int w_handle_linestring(struct info *info, const GEOSGeometry *geom)
     return err;
 }
 
-static int w_handle(struct info *info, const GEOSGeometry *geom)
+static int w_handle(struct wkt *wkt,
+                    const GEOSGeometry *geom,
+                    const char *gtype,
+                    void *user_data)
 {
     int err = 1;
-    char *gtype;
+    struct info *info = user_data;
 
-    gtype = GEOSGeomType_r(info->wkt.handle, geom);
-
+    (void)wkt;
     if (!strcmp(gtype, "Point")) {
         err = w_handle_point(info, geom);
     } else if (!strcmp(gtype, "Polygon")) {
@@ -152,8 +154,6 @@ static int w_handle(struct info *info, const GEOSGeometry *geom)
     } else {
         fprintf(stderr,"Missing handler for %s\n", gtype);
     }
-
-    free(gtype);
 
     return err;
 }
@@ -193,17 +193,9 @@ static int w_setup(struct info *info)
 static int w_interpret(struct info *info)
 {
     int err = 1;
-    int i;
-    int n;
 
     /* interpret */
-    n = GEOSGetNumGeometries_r(info->wkt.handle, info->wkt.geom);
-    for (i=0; i<n; i++) {
-        err = w_handle(info, GEOSGetGeometryN_r(info->wkt.handle, info->wkt.geom, i));
-        if (err) {
-            break;
-        }
-    }
+    err = wkt_iterate(&info->wkt, w_handle, info);
 
     return err;
 }

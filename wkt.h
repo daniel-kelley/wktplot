@@ -27,6 +27,12 @@ struct wkt {
     GEOSContextHandle_t handle;
 };
 
+typedef int (*wkt_iterator_t)(
+    struct wkt *wkt,
+    const GEOSGeometry *geom,
+    const char *gtype,
+    void *user_data);
+
 extern int wkt_open(struct wkt *wkt, const char *file);
 extern int wkt_snag(struct wkt *wkt, const char *file);
 extern int wkt_close(struct wkt *wkt);
@@ -41,5 +47,10 @@ extern int wkt_bounds(
     double *xmax,
     double *ymin,
     double *ymax);
+extern int wkt_iterate(
+    struct wkt *wkt,
+    wkt_iterator_t iterator,
+    void *user_data);
+
 
 #endif /* _WKT_H_ */
