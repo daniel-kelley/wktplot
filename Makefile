@@ -37,6 +37,18 @@ WKTRAND_DEP := $(WKTRAND_SRC:%.c=%.d)
 OBJ += $(WKTRAND_OBJ)
 DEP += $(WKTRAND_DEP)
 
+WKTDEL_SRC := wktdel.c
+WKTDEL_OBJ := $(WKTDEL_SRC:%.c=%.o)
+WKTDEL_DEP := $(WKTDEL_SRC:%.c=%.d)
+OBJ += $(WKTDEL_OBJ)
+DEP += $(WKTDEL_DEP)
+
+WKTVOR_SRC := wktvor.c
+WKTVOR_OBJ := $(WKTVOR_SRC:%.c=%.o)
+WKTVOR_DEP := $(WKTVOR_SRC:%.c=%.d)
+OBJ += $(WKTVOR_OBJ)
+DEP += $(WKTVOR_DEP)
+
 LIBMAJOR := 0
 LIBMINOR := 1
 
@@ -60,7 +72,7 @@ WKTLIB_DEP := $(WKTLIB_SRC:%.c=%.d)
 OBJ += $(WKTLIB_OBJ)
 DEP += $(WKTLIB_DEP)
 
-PROG := wktplot wktrand
+PROG := wktplot wktrand wktdel wktvor
 
 .PHONY: all install uninstall clean
 
@@ -69,6 +81,10 @@ all: $(PROG) $(LIBRARY) $(SHLIBRARY)
 wktplot: $(WKTPLOT_SRC) $(SHLIBRARY)
 
 wktrand: $(WKTRAND_SRC) $(SHLIBRARY)
+
+wktdel: $(WKTDEL_SRC) $(SHLIBRARY)
+
+wktvor: $(WKTVOR_SRC) $(SHLIBRARY)
 
 $(LIBRARY): $(WKTLIB_OBJ)
 	$(AR) cr $@ $^
@@ -86,6 +102,13 @@ install: $(PROG) $(SHLIBRARY) $(LIBRARY)
 
 uninstall:
 	-rm -f $(PREFIX)/bin/wktplot
+
+test: $(PROG)
+	LD_LIBRARY_PATH=. ./wktrand -n 8 -x 10 -y 10 rr.wkt
+	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
+	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
+	LD_LIBRARY_PATH=. ./wktplot -TX del.wkt
+	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
 
 clean:
 	-rm -f $(PROG) $(SHLIBRARY) $(SHLIBRARY_VER) $(LIBRARY) $(OBJ) $(DEP)
