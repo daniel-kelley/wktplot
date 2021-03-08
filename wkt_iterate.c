@@ -5,7 +5,6 @@
 
 */
 
-#include <stdlib.h>
 #include "wkt.h"
 
 int wkt_iterate(struct wkt *wkt, wkt_iterator_t iterator, void *user_data)
@@ -31,7 +30,7 @@ int wkt_iterate(struct wkt *wkt, wkt_iterator_t iterator, void *user_data)
 
         err = iterator(wkt, geom, gtype, user_data);
 
-        free(gtype);
+        GEOSFree_r(wkt->handle, gtype);
 
         if (err) {
             break;

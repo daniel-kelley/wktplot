@@ -32,6 +32,7 @@ static int w_random(struct info *info)
 
     info->point = calloc(info->count, sizeof(*info->point));
     assert(info->point != NULL);
+
     for (i=0; i < info->count; i++) {
         x = drand48() * info->width;
         y = drand48() * info->height;
@@ -39,6 +40,7 @@ static int w_random(struct info *info)
         assert(geom != NULL);
         info->point[i] = geom;
     }
+
     info->geom = GEOSGeom_createCollection_r(
         info->wkt.handle,
         GEOS_GEOMETRYCOLLECTION,
@@ -52,29 +54,43 @@ static int w_random(struct info *info)
 
 static void w_free(struct info *info)
 {
-    unsigned long i;
-
     if (info->geom) {
-        //Segfaults if called, leaks if not.
-        //GEOSGeom_destroy_r(info->wkt.handle, info->geom);
-    }
-
-    for (i=0; i < info->count; i++) {
-        GEOSGeom_destroy_r(info->wkt.handle, (void *)info->point[i]);
+        GEOSGeom_destroy_r(info->wkt.handle, info->geom);
     }
 
     if (info->point) {
+        /* Note that points themselves do not have to be destroyed. */
         free(info->point);
     }
+}
+
+static int w_op(struct info *info, const char *file)
+{
+    int err;
+
+    err = wkt_open(&info->wkt);
+    if (!err) {
+        err = w_random(info);
+    }
+    if (!err) {
+        err = wkt_write(&info->wkt, file, info->geom);
+        w_free(info);
+    }
+    wkt_close(&info->wkt);
+
+    return err;
 }
 
 static void usage(const char *prog)
 {
     fprintf(
         stderr,
-        "%s -x n -y n -s n -n n [-vh] <output>\n",
+        "%s -xf -yf -sn -nn [-bBvh] <output>\n",
         prog);
     fprintf(stderr,"  -h        Print this message\n");
+    fprintf(stderr,"  -v        Verbose messages\n");
+    fprintf(stderr,"  -b        WKB output\n");
+    fprintf(stderr,"  -B        WKB HEX output\n");
     fprintf(stderr,"  -x n      Output width\n");
     fprintf(stderr,"  -y n      Output height\n");
     fprintf(stderr,"  -s f      Random seed\n");
@@ -85,6 +101,7 @@ int main(int argc, char *argv[])
 {
     int err = 1;
     int c;
+    int num_arg;
     struct info info;
 
     memset(&info, 0, sizeof(info));
@@ -115,23 +132,21 @@ int main(int argc, char *argv[])
             break;
         case 'h':
             usage(argv[0]);
-            err = EXIT_SUCCESS;
+            return(EXIT_SUCCESS);
             break;
         default:
             break;
         }
     }
 
-    if (optind < argc) {
-        err = wkt_open(&info.wkt);
-        if (!err) {
-            err = w_random(&info);
-        }
-        if (!err) {
-            err = wkt_write(&info.wkt, argv[optind], info.geom);
-            w_free(&info);
-        }
-        wkt_close(&info.wkt);
+    num_arg = argc - optind;
+
+    if (num_arg <= 1) {
+        char *file = num_arg ? argv[optind] : NULL;
+        err = w_op(&info, file);
+    } else {
+        usage(argv[0]);
+        err = 1;
     }
 
     return err;
