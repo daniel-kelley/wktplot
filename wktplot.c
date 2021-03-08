@@ -9,103 +9,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 #include <plot.h>
-#include <geos_c.h>
-
-typedef enum {
-    READER_NONE,
-    READER_ASCII,       /* default */
-    READER_BINARY,      /* -b      */
-    READER_HEX,         /* -B      */
-} reader_t;
+#include "wkt.h"
 
 struct info {
     int verbose;
     double width;
     const char *pen;
-    reader_t reader;
     const char *format;
     plPlotter *plotter;
     plPlotterParams *param;
-    const char *input;
-    size_t input_len;
-    GEOSGeometry *geom;
-    GEOSWKTReader *wktr;
-    GEOSWKBReader *wkbr;
-    GEOSContextHandle_t handle;
+    struct wkt wkt;
 };
 
-static int w_iterate_coord_seq(
-    struct info *info,
-    const GEOSGeometry *geom,
-    int (*handler)(struct info *, unsigned, unsigned, double, double, void *),
-    void *user_data)
-{
-    int err = 1;
-    int rc;
-    unsigned int n;
-    unsigned int d;
-    unsigned int i;
-    const GEOSCoordSequence* s;
-
-    do {
-        s = GEOSGeom_getCoordSeq_r(info->handle, geom);
-        if (s == NULL) {
-            break;
-        }
-
-        rc = GEOSCoordSeq_getSize_r(info->handle, s, &n);
-        if (!rc) {
-            break;
-        }
-
-        rc = GEOSCoordSeq_getDimensions_r(info->handle, s, &d);
-        if (!rc) {
-            break;
-        }
-
-        if (d != 2) {
-            fprintf(stderr, "Unsupported Point dimension %u\n", d);
-            break;
-        }
-
-        err = 0;
-
-        for (i=0; i<n; i++) {
-            double x;
-            double y;
-
-            rc = GEOSCoordSeq_getXY_r(info->handle, s, i, &x, &y);
-            if (!rc) {
-                err = 1;
-                break;
-            }
-            err = handler(info, i, n, x, y, user_data);
-            if (err) {
-                break;
-            }
-        }
-
-    } while (0);
-
-    return err;
-}
+struct line_info {
+    struct info *info;
+    double prev[2];
+};
 
 static int w_point_iterator(
-    struct info *info,
+    struct wkt *wkt,
     unsigned i,
     unsigned n,
     double x,
     double y,
     void *user_data)
 {
-    (void)user_data;
+    struct info *info = user_data;
+
+    (void)wkt;
     if (info->verbose) {
         fprintf(stderr, "Point %u/%u [%g,%g]\n", i, n, x, y);
     }
@@ -115,15 +48,18 @@ static int w_point_iterator(
 }
 
 static int w_line_iterator(
-    struct info *info,
+    struct wkt *wkt,
     unsigned i,
     unsigned n,
     double x,
     double y,
     void *user_data)
 {
-    double *prev = user_data;
+    struct line_info *line_info = user_data;
+    struct info *info = line_info->info;
+    double *prev = line_info->prev;
 
+    (void)wkt;
     if (info->verbose) {
         fprintf(stderr, "Line %u/%u [%g,%g]\n", i, n, x, y);
     }
@@ -140,7 +76,7 @@ static int w_line_iterator(
 
 static int w_handle_point(struct info *info, const GEOSGeometry *geom)
 {
-    return w_iterate_coord_seq(info, geom, w_point_iterator, NULL);
+    return wkt_iterate_coord_seq(&info->wkt, geom, w_point_iterator, info);
 }
 
 static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
@@ -149,28 +85,29 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
     int n;
     int i;
     const GEOSGeometry *g;
-    double prev[2];
+    struct line_info line_info;
 
+    line_info.info = info;
     do {
-        g = GEOSGetExteriorRing_r(info->handle, geom);
+        g = GEOSGetExteriorRing_r(info->wkt.handle, geom);
         if (g==NULL) {
             break;
         }
 
-        err = w_iterate_coord_seq(info, g, w_line_iterator, prev);
+        err = wkt_iterate_coord_seq(&info->wkt, g, w_line_iterator, &line_info);
         if (err) {
             break;
         }
 
-        n = GEOSGetNumInteriorRings_r(info->handle, geom);
+        n = GEOSGetNumInteriorRings_r(info->wkt.handle, geom);
 
         for (i=0; i<n; i++) {
-            g = GEOSGetInteriorRingN_r(info->handle, geom, i);
+            g = GEOSGetInteriorRingN_r(info->wkt.handle, geom, i);
             if (g==NULL) {
                 break;
             }
 
-            err = w_iterate_coord_seq(info, g, w_line_iterator, prev);
+            err = wkt_iterate_coord_seq(&info->wkt, g, w_line_iterator, &line_info);
             if (err) {
                 break;
             }
@@ -184,20 +121,24 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
 static int w_handle_linestring(struct info *info, const GEOSGeometry *geom)
 {
     int err;
-    double prev[2];
+    struct line_info line_info;
 
-    err = w_iterate_coord_seq(info, geom, w_line_iterator, prev);
+    line_info.info = info;
+
+    err = wkt_iterate_coord_seq(&info->wkt, geom, w_line_iterator, &line_info);
 
     return err;
 }
 
-static int w_handle(struct info *info, const GEOSGeometry *geom)
+static int w_handle(struct wkt *wkt,
+                    const GEOSGeometry *geom,
+                    const char *gtype,
+                    void *user_data)
 {
     int err = 1;
-    char *gtype;
+    struct info *info = user_data;
 
-    gtype = GEOSGeomType_r(info->handle, geom);
-
+    (void)wkt;
     if (!strcmp(gtype, "Point")) {
         err = w_handle_point(info, geom);
     } else if (!strcmp(gtype, "Polygon")) {
@@ -207,8 +148,6 @@ static int w_handle(struct info *info, const GEOSGeometry *geom)
     } else {
         fprintf(stderr,"Missing handler for %s\n", gtype);
     }
-
-    free(gtype);
 
     return err;
 }
@@ -224,23 +163,7 @@ static int w_setup(struct info *info)
     double ymax = 1000.0;
 
     do {
-        /* get bounds */
-        rc = GEOSGeom_getXMin_r(info->handle, info->geom, &xmin);
-        if (!rc) {
-            break;
-        }
-
-        rc = GEOSGeom_getXMax_r(info->handle, info->geom, &xmax);
-        if (!rc) {
-            break;
-        }
-
-        rc = GEOSGeom_getYMin_r(info->handle, info->geom, &ymin);
-        if (!rc) {
-            break;
-        }
-
-        rc = GEOSGeom_getYMax_r(info->handle, info->geom, &ymax);
+        rc = wkt_bounds(&info->wkt, &xmin, &xmax, &ymin, &ymax);
         if (!rc) {
             break;
         }
@@ -264,17 +187,9 @@ static int w_setup(struct info *info)
 static int w_interpret(struct info *info)
 {
     int err = 1;
-    int i;
-    int n;
 
     /* interpret */
-    n = GEOSGetNumGeometries_r(info->handle, info->geom);
-    for (i=0; i<n; i++) {
-        err = w_handle(info, GEOSGetGeometryN_r(info->handle, info->geom, i));
-        if (err) {
-            break;
-        }
-    }
+    err = wkt_iterate(&info->wkt, w_handle, info);
 
     return err;
 }
@@ -334,130 +249,6 @@ static int w_plot(struct info *info)
     return err;
 }
 
-static int w_snag(struct info *info, const char *file)
-{
-    int err = 1;
-    int fd;
-    struct stat stat;
-
-    do {
-        fd = open(file, O_RDONLY);
-        /* open */
-        if (fd < 0) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
-            break;
-        }
-
-        /* fstat */
-        err = fstat(fd, &stat);
-
-        if (err) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
-            break;
-        }
-
-        info->input_len = stat.st_size;
-
-        /* mmap */
-        info->input = mmap(
-            NULL,
-            info->input_len,
-            PROT_READ,
-            MAP_PRIVATE,
-            fd,
-            0);
-
-        if (!info->input) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
-            err = -1;
-            break;
-        }
-
-
-    } while (0);
-
-    if (fd >= 0 ) {
-        close(fd); /* fd not needed any more */
-    }
-
-    return err;
-}
-static int w_open(struct info *info, const char *file)
-{
-    int err = 1;
-
-    info->handle = GEOS_init_r();
-    assert(info->handle != NULL);
-
-    switch (info->reader) {
-    case READER_ASCII:
-        info->wktr = GEOSWKTReader_create_r(info->handle);
-        err = (info->wktr == NULL);
-        break;
-    case READER_BINARY:
-    case READER_HEX:
-        info->wkbr = GEOSWKBReader_create_r(info->handle);
-        err = (info->wkbr == NULL);
-        break;
-    default:
-        err = 1;
-        break;
-    }
-
-    if (!err) {
-        err = w_snag(info, file);
-    }
-
-    if (err) {
-        info->reader = READER_NONE;
-    }
-
-    switch (info->reader) {
-    case READER_ASCII:
-        info->geom = GEOSWKTReader_read_r(info->handle, info->wktr, info->input);
-        err = (info->geom == NULL);
-        break;
-    case READER_BINARY:
-        info->geom = GEOSWKBReader_read_r(
-            info->handle,
-            info->wkbr,
-            (const unsigned char *)info->input,
-            info->input_len);
-        err = (info->geom == NULL);
-        break;
-    case READER_HEX:
-        info->geom = GEOSWKBReader_readHEX_r(
-            info->handle,
-            info->wkbr,
-            (const unsigned char *)info->input,
-            info->input_len);
-        err = (info->geom == NULL);
-        break;
-    default:
-        err = 1;
-        break;
-    }
-
-    return err;
-}
-
-static int w_close(struct info *info)
-{
-    int err = 1;
-
-    if (info->wktr) {
-        GEOSWKTReader_destroy_r(info->handle, info->wktr);
-    }
-
-    if (info->wkbr) {
-        GEOSWKBReader_destroy_r(info->handle, info->wkbr);
-    }
-
-    GEOS_finish_r(info->handle);
-
-    return err;
-}
-
 static int set_option(struct info *info, const char *arg)
 {
     int err = 1;
@@ -499,7 +290,7 @@ int main(int argc, char *argv[])
 
     memset(&info, 0, sizeof(info));
     info.param = pl_newplparams();
-    info.reader = READER_ASCII;
+    info.wkt.reader = WKT_IO_ASCII;
     info.width = 0.1;
     info.format = "svg";
     assert(info.param != NULL);
@@ -516,10 +307,10 @@ int main(int argc, char *argv[])
             set_option(&info, optarg);
             break;
         case 'b':
-            info.reader = READER_BINARY;
+            info.wkt.reader = WKT_IO_BINARY;
             break;
         case 'B':
-            info.reader = READER_HEX;
+            info.wkt.reader = WKT_IO_HEX;
             break;
         case 'v':
             info.verbose = 1;
@@ -534,11 +325,14 @@ int main(int argc, char *argv[])
     }
 
     if (optind < argc) {
-        err = w_open(&info, argv[optind]);
+        err = wkt_open(&info.wkt);
+        if (!err) {
+            err = wkt_read(&info.wkt, argv[optind]);
+        }
         if (!err) {
             err = w_plot(&info);
         }
-        w_close(&info);
+        wkt_close(&info.wkt);
     }
 
     return err;
