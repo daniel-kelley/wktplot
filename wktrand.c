@@ -10,42 +10,105 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 #include <geos_c.h>
 #include "wkt.h"
 
+#define BACKSTOP 10 /* number of counts to limit uniqueness tests */
+
 struct info {
     int verbose;
+    int unique;
+    double interval; /* quantized; 0.0 = none */
     double width;
     double height;
+    unsigned long points;
     unsigned long count;
     GEOSGeometry *geom;
     GEOSGeometry **point;
     struct wkt wkt;
 };
 
+static double w_value(struct info *info, double max)
+{
+    double value;
+
+
+    value = drand48() * max;
+    if (info->interval != 0.0) {
+        value = floor(value / info->interval) * info->interval;
+    }
+
+    return value;
+}
+
+/* See if we have this point already. */
+static int w_has(struct info *info, GEOSGeometry *geom)
+{
+    double x0;
+    double y0;
+    double x1;
+    double y1;
+    unsigned long i;
+
+    assert(GEOSGeomGetX_r(info->wkt.handle, geom, &x0) != 0);
+    assert(GEOSGeomGetY_r(info->wkt.handle, geom, &y0) != 0);
+    for (i=0; i<info->points; i++) {
+        assert(GEOSGeomGetX_r(info->wkt.handle, info->point[i], &x1) != 0);
+        assert(GEOSGeomGetY_r(info->wkt.handle, info->point[i], &y1) != 0);
+        /* These values are known to be quantized so f.p. equality
+         * should be OK. If testing uniqueness and not quantized, well
+         * shame!
+         */
+        if (x0 == x1 && y0 == y1) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int w_add(struct info *info, GEOSGeometry *geom)
+{
+    if (info->unique && w_has(info, geom)) {
+        return 0;
+    }
+
+    info->point[info->points] = geom;
+    info->points++;
+
+    return 1;
+}
+
 static int w_random(struct info *info)
 {
-    unsigned long i;
     double x;
     double y;
     GEOSGeometry *geom;
+    long backstop = BACKSTOP * info->count;
 
     info->point = calloc(info->count, sizeof(*info->point));
     assert(info->point != NULL);
 
-    for (i=0; i < info->count; i++) {
-        x = drand48() * info->width;
-        y = drand48() * info->height;
+    /* Bad combinations of uniqueness and interval could conspire to
+     * make it impossible to generate enough random points, so use a
+     * backstop to limit the number of iterations.
+     */
+    while (info->points < info->count && backstop-- > 0) {
+        x = w_value(info, info->width);
+        y = w_value(info, info->height);
         geom = GEOSGeom_createPointFromXY_r(info->wkt.handle, x, y);
         assert(geom != NULL);
-        info->point[i] = geom;
+        if (!w_add(info, geom)) {
+            GEOSGeom_destroy_r(info->wkt.handle, geom);
+        }
     }
 
     info->geom = GEOSGeom_createCollection_r(
         info->wkt.handle,
         GEOS_GEOMETRYCOLLECTION,
         info->point,
-        info->count);
+        info->points);
 
     assert(info->geom != NULL);
 
@@ -89,12 +152,15 @@ static void usage(const char *prog)
         prog);
     fprintf(stderr,"  -h        Print this message\n");
     fprintf(stderr,"  -v        Verbose messages\n");
+    fprintf(stderr,"  -u        Ensure points are unique\n");
+    fprintf(stderr,"  -q        Quantization interval\n");
     fprintf(stderr,"  -b        WKB output\n");
     fprintf(stderr,"  -B        WKB HEX output\n");
     fprintf(stderr,"  -x n      Output width\n");
     fprintf(stderr,"  -y n      Output height\n");
     fprintf(stderr,"  -s f      Random seed\n");
     fprintf(stderr,"  -n n      Number of points\n");
+    fprintf(stderr,"  -q f      Quantization interval\n");
 }
 
 int main(int argc, char *argv[])
@@ -107,7 +173,7 @@ int main(int argc, char *argv[])
     memset(&info, 0, sizeof(info));
     info.wkt.writer = WKT_IO_ASCII;
 
-    while ((c = getopt(argc, argv, "x:y:s:n:Bbvh")) != EOF) {
+    while ((c = getopt(argc, argv, "x:y:s:n:q:Bbuvh")) != EOF) {
         switch (c) {
         case 'x':
             info.width = strtod(optarg,0);
@@ -120,6 +186,12 @@ int main(int argc, char *argv[])
             break;
         case 's':
             srand48(strtol(optarg,0,0));
+            break;
+        case 'q':
+            info.interval = strtod(optarg,0);
+            break;
+        case 'u':
+            info.unique = 1;
             break;
         case 'v':
             info.verbose = 1;
