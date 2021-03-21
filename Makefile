@@ -49,6 +49,12 @@ WKTVOR_DEP := $(WKTVOR_SRC:%.c=%.d)
 OBJ += $(WKTVOR_OBJ)
 DEP += $(WKTVOR_DEP)
 
+WKTHULL_SRC := wkthull.c
+WKTHULL_OBJ := $(WKTHULL_SRC:%.c=%.o)
+WKTHULL_DEP := $(WKTHULL_SRC:%.c=%.d)
+OBJ += $(WKTHULL_OBJ)
+DEP += $(WKTHULL_DEP)
+
 LIBMAJOR := 0
 LIBMINOR := 1
 
@@ -72,7 +78,7 @@ WKTLIB_DEP := $(WKTLIB_SRC:%.c=%.d)
 OBJ += $(WKTLIB_OBJ)
 DEP += $(WKTLIB_DEP)
 
-PROG := wktplot wktrand wktdel wktvor
+PROG := wktplot wktrand wktdel wktvor wkthull
 
 .PHONY: all install uninstall clean
 
@@ -85,6 +91,8 @@ wktrand: $(WKTRAND_SRC) $(SHLIBRARY)
 wktdel: $(WKTDEL_SRC) $(SHLIBRARY)
 
 wktvor: $(WKTVOR_SRC) $(SHLIBRARY)
+
+wkthull: $(WKTHULL_SRC) $(SHLIBRARY)
 
 $(LIBRARY): $(WKTLIB_OBJ)
 	$(AR) cr $@ $^
@@ -104,11 +112,13 @@ uninstall:
 	-rm -f $(PREFIX)/bin/wktplot
 
 test: $(PROG)
-	LD_LIBRARY_PATH=. ./wktrand -n 8 -x 10 -y 10 rr.wkt
+	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
 	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
 	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
+	LD_LIBRARY_PATH=. ./wkthull rr.wkt hull.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX del.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
+	LD_LIBRARY_PATH=. ./wktplot -TX hull.wkt
 
 clean:
 	-rm -f $(PROG) $(SHLIBRARY) $(SHLIBRARY_VER) $(LIBRARY) $(OBJ) $(DEP)
