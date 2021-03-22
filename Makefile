@@ -1,7 +1,7 @@
 #
 #  Makefile
 #
-#  Copyright (c) 2012 by Daniel Kelley
+#  Copyright (c) 2021 by Daniel Kelley
 #
 
 DEBUG ?= -g
