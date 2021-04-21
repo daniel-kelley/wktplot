@@ -269,6 +269,12 @@ static int w_plot(struct info *info)
             break;
         }
 
+        /* delete plotter parms */
+        if (info->param && pl_deleteplparams(info->param) < 0) {
+            fprintf(stderr, "Could not delete plotter params\n");
+            break;
+        }
+
         /* delete plotter */
         if (pl_deletepl_r(info->plotter) < 0) {
             fprintf(stderr, "Could not delete plotter %s\n", info->format);
