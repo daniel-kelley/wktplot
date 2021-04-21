@@ -23,7 +23,7 @@ WARN += -Werror
 CFLAGS := $(WARN) $(DEBUG) -fPIC
 
 LDFLAGS := $(DEBUG) -L.
-LDLIBS := -lplot -lgeos_c -lwkt -lm
+LDLIBS := -ligraph -lplot -lgeos_c -lwkt -lm
 
 WKTPLOT_SRC := wktplot.c
 WKTPLOT_OBJ := $(WKTPLOT_SRC:%.c=%.o)

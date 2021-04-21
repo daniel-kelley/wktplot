@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <plot.h>
+#include <igraph/igraph.h>
 #include "wkt.h"
 
 struct info {
@@ -18,6 +20,9 @@ struct info {
     double width;
     const char *pen;
     const char *format;
+    int has_color;
+    int polygon_idx;
+    igraph_t color;
     plPlotter *plotter;
     plPlotterParams *param;
     struct wkt wkt;
@@ -79,6 +84,23 @@ static int w_handle_point(struct info *info, const GEOSGeometry *geom)
     return wkt_iterate_coord_seq(&info->wkt, geom, w_point_iterator, info);
 }
 
+static int w_label_polygon(struct info *info)
+{
+    double color;
+    double x;
+    double y;
+    char color_s[32];
+
+    color = igraph_cattribute_VAN(&info->color, "color", info->polygon_idx);
+    x = igraph_cattribute_VAN(&info->color, "x", info->polygon_idx);
+    y = igraph_cattribute_VAN(&info->color, "y", info->polygon_idx);
+    snprintf(color_s, sizeof(color_s), "%g", color);
+    pl_fmove_r(info->plotter, x, y);
+    pl_alabel_r(info->plotter, 'c', 'c', color_s);
+
+    return 0;
+}
+
 static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
 {
     int err = 1;
@@ -92,6 +114,13 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
         g = GEOSGetExteriorRing_r(info->wkt.handle, geom);
         if (g==NULL) {
             break;
+        }
+
+        if (info->has_color) {
+            err = w_label_polygon(info);
+            if (err) {
+                break;
+            }
         }
 
         err = wkt_iterate_coord_seq(&info->wkt, g, w_line_iterator, &line_info);
@@ -112,6 +141,8 @@ static int w_handle_polygon(struct info *info, const GEOSGeometry *geom)
                 break;
             }
         }
+
+        info->polygon_idx++;
 
     } while (0);
 
@@ -271,13 +302,40 @@ static int set_option(struct info *info, const char *arg)
     return err;
 }
 
+static int color_read(struct info *info, const char *filename)
+{
+    int err = 1;
+    FILE *f;
+
+    do {
+        igraph_i_set_attribute_table(&igraph_cattribute_table);
+        f = fopen(filename, "r");
+        if (f == NULL) {
+            fprintf( stderr, "Cannot open %s: %s\n", filename, strerror(errno));
+            break;
+        }
+        err = igraph_read_graph_graphml(&info->color, f, 0);
+        fclose(f);
+        info->has_color = !err;
+    } while (0);
+
+    return err;
+}
+
+static void color_cleanup(struct info *info)
+{
+    igraph_destroy(&info->color);
+}
+
 static void usage(const char *prog)
 {
-    fprintf(stderr,"%s -T format -O opt [-bvwh] <input>\n", prog);
+    fprintf(stderr,"%s -T format -O opt [-bBvh] <input>\n", prog);
     fprintf(stderr,"  -h        Print this message\n");
     fprintf(stderr,"  -w n      Line width\n");
     fprintf(stderr,"  -T format Output format\n");
+    fprintf(stderr,"  -c gml    Read color GML file\n");
     fprintf(stderr,"  -b        Input is WKB\n");
+    fprintf(stderr,"  -B        Input is WKH\n");
     fprintf(stderr,"  -v        Verbose\n");
     fprintf(stderr,"  -O opt=v  Output option=v\n");
 }
@@ -287,6 +345,7 @@ int main(int argc, char *argv[])
     int err = 1;
     int c;
     struct info info;
+    const char *color_file = NULL;
 
     memset(&info, 0, sizeof(info));
     info.param = pl_newplparams();
@@ -295,13 +354,16 @@ int main(int argc, char *argv[])
     info.format = "svg";
     assert(info.param != NULL);
 
-    while ((c = getopt(argc, argv, "w:T:O:bBvh")) != EOF) {
+    while ((c = getopt(argc, argv, "w:T:O:c:bBvh")) != EOF) {
         switch (c) {
         case 'w':
             info.width = strtod(optarg,0);
             break;
         case 'T':
             info.format = optarg;
+            break;
+        case 'c':
+            color_file = optarg;
             break;
         case 'O':
             set_option(&info, optarg);
@@ -326,11 +388,17 @@ int main(int argc, char *argv[])
 
     if (optind < argc) {
         err = wkt_open(&info.wkt);
+        if (!err && color_file) {
+            err = color_read(&info, color_file);
+        }
         if (!err) {
             err = wkt_read(&info.wkt, argv[optind]);
         }
         if (!err) {
             err = w_plot(&info);
+        }
+        if (info.has_color) {
+            color_cleanup(&info);
         }
         wkt_close(&info.wkt);
     }
