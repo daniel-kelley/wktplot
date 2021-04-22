@@ -1,0 +1,10 @@
+*.so
+*.d
+*.o
+*.wkt
+*.a
+wktdel
+wkthull
+wktplot
+wktrand
+wktvor
