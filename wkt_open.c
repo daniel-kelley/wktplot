@@ -11,7 +11,7 @@
 static void wkt_message(const char *message, void *userdata)
 {
     const char *locus = (char *)userdata;
-    printf("GEOS-%s: %s\n", locus, message);
+    fprintf(stderr, "GEOS-%s: %s\n", locus, message);
 }
 
 int wkt_open(struct wkt *wkt)
