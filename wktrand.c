@@ -14,12 +14,15 @@
 #include <geos_c.h>
 #include "wkt.h"
 
-#define BACKSTOP 10 /* number of counts to limit uniqueness tests */
+#define BACKSTOP 10 /* number of counts to limit uniqueness/distance tests */
 
 struct info {
     int verbose;
     int unique;
+    int backstop;
     double interval; /* quantized; 0.0 = none */
+    double distance; /* implies unique */
+    double distance_squared; /* distance squared */
     double width;
     double height;
     unsigned long points;
@@ -34,7 +37,10 @@ static double w_value(struct info *info, double max)
     double value;
 
 
-    value = drand48() * max;
+    /* Constrain point to be away from edges by given distance */
+    max -= (info->distance * 2.0);
+    value = (drand48() * max) + info->distance;
+
     if (info->interval != 0.0) {
         value = floor(value / info->interval) * info->interval;
     }
@@ -49,6 +55,9 @@ static int w_has(struct info *info, GEOSGeometry *geom)
     double y0;
     double x1;
     double y1;
+    double dx;
+    double dy;
+    double distance_squared;
     unsigned long i;
 
     assert(GEOSGeomGetX_r(info->wkt.handle, geom, &x0) != 0);
@@ -61,6 +70,19 @@ static int w_has(struct info *info, GEOSGeometry *geom)
          * shame!
          */
         if (x0 == x1 && y0 == y1) {
+            return 1;
+        }
+
+        /*
+         * Explictly check distance. Note: Could not get strtree to
+         * work on points: "Can't compute envelope of item in
+         * BoundablePair". Work on squared distance because there's no
+         * good reason to take the square root.
+         */
+        dx = x1 - x0;
+        dy = y1 - y0;
+        distance_squared = (dx*dx) + (dy*dy);
+        if (distance_squared < info->distance_squared) {
             return 1;
         }
     }
@@ -85,10 +107,13 @@ static int w_random(struct info *info)
     double x;
     double y;
     GEOSGeometry *geom;
-    long backstop = BACKSTOP * info->count;
+    long backstop = info->backstop * info->count;
 
     info->point = calloc(info->count, sizeof(*info->point));
     assert(info->point != NULL);
+
+    /* Save distance squared for distance measurements. */
+    info->distance_squared = info->distance * info->distance;
 
     /* Bad combinations of uniqueness and interval could conspire to
      * make it impossible to generate enough random points, so use a
@@ -148,12 +173,11 @@ static void usage(const char *prog)
 {
     fprintf(
         stderr,
-        "%s -xf -yf -sn -nn [-bBvh] <output>\n",
+        "%s -xf -yf -sn -nn -qf -rf -Nn [-bBuvh] <output>\n",
         prog);
     fprintf(stderr,"  -h        Print this message\n");
     fprintf(stderr,"  -v        Verbose messages\n");
     fprintf(stderr,"  -u        Ensure points are unique\n");
-    fprintf(stderr,"  -q        Quantization interval\n");
     fprintf(stderr,"  -b        WKB output\n");
     fprintf(stderr,"  -B        WKB HEX output\n");
     fprintf(stderr,"  -x n      Output width\n");
@@ -161,6 +185,8 @@ static void usage(const char *prog)
     fprintf(stderr,"  -s f      Random seed\n");
     fprintf(stderr,"  -n n      Number of points\n");
     fprintf(stderr,"  -q f      Quantization interval\n");
+    fprintf(stderr,"  -r f      Minimum distance\n");
+    fprintf(stderr,"  -N n      Uniqueness/distance retries\n");
 }
 
 int main(int argc, char *argv[])
@@ -172,8 +198,9 @@ int main(int argc, char *argv[])
 
     memset(&info, 0, sizeof(info));
     info.wkt.writer = WKT_IO_ASCII;
+    info.backstop = BACKSTOP;
 
-    while ((c = getopt(argc, argv, "x:y:s:n:q:Bbuvh")) != EOF) {
+    while ((c = getopt(argc, argv, "x:y:s:n:q:r:N:Bbuvh")) != EOF) {
         switch (c) {
         case 'x':
             info.width = strtod(optarg,0);
@@ -189,6 +216,17 @@ int main(int argc, char *argv[])
             break;
         case 'q':
             info.interval = strtod(optarg,0);
+            /* implies -r, -u */
+            info.distance = info.interval;
+            info.unique = 1;
+            break;
+        case 'r':
+            info.distance = strtod(optarg,0);
+            /* implies -u */
+            info.unique = 1;
+            break;
+        case 'N':
+            info.backstop = strtol(optarg,0,0);
             break;
         case 'u':
             info.unique = 1;
