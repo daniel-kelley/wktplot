@@ -30,13 +30,13 @@ int wkt_stash(const char *file, const char *data, size_t len)
     }
 
     if (fd < 0) {
-        fprintf(stderr, "%s: %s", name, strerror(errno));
+        fprintf(stderr, "%s: %s\n", name, strerror(errno));
     } else {
         written = write(fd, data, len);
         if (written < 0) {
-            fprintf(stderr, "%s: %s", name, strerror(errno));
+            fprintf(stderr, "%s: %s\n", name, strerror(errno));
         } else if ((size_t)written != len) {
-            fprintf(stderr, "%s: truncated", name);
+            fprintf(stderr, "%s: truncated\n", name);
         } else {
             err = 0;
         }

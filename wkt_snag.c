@@ -26,7 +26,7 @@ int wkt_snag(struct wkt *wkt, const char *file)
         fd = open(file, O_RDONLY);
         /* open */
         if (fd < 0) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
+            fprintf(stderr, "%s: %s\n", file, strerror(errno));
             break;
         }
 
@@ -34,7 +34,7 @@ int wkt_snag(struct wkt *wkt, const char *file)
         err = fstat(fd, &stat);
 
         if (err) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
+            fprintf(stderr, "%s: %s\n", file, strerror(errno));
             break;
         }
 
@@ -50,7 +50,7 @@ int wkt_snag(struct wkt *wkt, const char *file)
             0);
 
         if (!wkt->input) {
-            fprintf(stderr, "%s: %s", file, strerror(errno));
+            fprintf(stderr, "%s: %s\n", file, strerror(errno));
             err = -1;
             break;
         }
