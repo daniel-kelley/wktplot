@@ -5,7 +5,14 @@
 
 */
 
+#include <stdio.h>
 #include "wkt.h"
+
+static void wkt_message(const char *message, void *userdata)
+{
+    const char *locus = (char *)userdata;
+    printf("GEOS-%s: %s\n", locus, message);
+}
 
 int wkt_open(struct wkt *wkt)
 {
@@ -56,6 +63,9 @@ int wkt_open(struct wkt *wkt)
         err = 1;
         break;
     }
+
+    GEOSContext_setNoticeMessageHandler_r(wkt->handle, wkt_message, "NOTICE");
+    GEOSContext_setErrorMessageHandler_r(wkt->handle, wkt_message, "ERROR");
 
     return err;
 }
