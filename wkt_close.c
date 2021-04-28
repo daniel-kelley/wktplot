@@ -27,6 +27,11 @@ int wkt_close(struct wkt *wkt)
         GEOSWKBWriter_destroy_r(wkt->handle, wkt->wkbw);
     }
 
+    if (wkt->geom) {
+        GEOSGeom_destroy_r(wkt->handle, wkt->geom);
+
+    }
+
     GEOS_finish_r(wkt->handle);
 
     return err;
