@@ -314,7 +314,7 @@ static int color_read(struct info *info, const char *filename)
     FILE *f;
 
     do {
-        igraph_i_set_attribute_table(&igraph_cattribute_table);
+        igraph_set_attribute_table(&igraph_cattribute_table);
         f = fopen(filename, "r");
         if (f == NULL) {
             fprintf( stderr, "Cannot open %s: %s\n", filename, strerror(errno));
