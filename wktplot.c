@@ -18,7 +18,7 @@
 /* igraph 0.8.X shim */
 #if IGRAPH_VERSION_MAJOR == 0
 #if IGRAPH_VERSION_MINOR < 9
-#define igraph_set_attribute_table igraph__i_set_attribute_table
+#define igraph_set_attribute_table igraph_i_set_attribute_table
 #endif
 #endif
 
