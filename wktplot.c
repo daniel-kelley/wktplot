@@ -15,6 +15,13 @@
 #include <igraph/igraph.h>
 #include "wkt.h"
 
+/* igraph 0.8.X shim */
+#if IGRAPH_VERSION_MAJOR == 0
+#if IGRAPH_VERSION_MINOR < 9
+#define igraph_set_attribute_table igraph__i_set_attribute_table
+#endif
+#endif
+
 struct info {
     int verbose;
     double width;
