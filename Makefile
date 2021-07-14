@@ -82,7 +82,7 @@ PROG := wktplot wktrand wktdel wktvor wkthull
 
 VG ?= valgrind --leak-check=full
 
-.PHONY: all install uninstall clean
+.PHONY: all install uninstall clean test check
 
 all: $(PROG) $(LIBRARY) $(SHLIBRARY)
 
@@ -121,6 +121,15 @@ test: $(PROG)
 	LD_LIBRARY_PATH=. ./wktplot -TX del.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX hull.wkt
+
+check:
+	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
+	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
+	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
+	LD_LIBRARY_PATH=. ./wkthull rr.wkt hull.wkt
+	LD_LIBRARY_PATH=. ./wktplot -Tsvg del.wkt > del.svg
+	LD_LIBRARY_PATH=. ./wktplot -Tsvg vor.wkt > vor.svg
+	LD_LIBRARY_PATH=. ./wktplot -Tsvg hull.wkt > hull.svg
 
 #
 # libplot is a bit leaky, but svg and X plotter is leakier than ps
