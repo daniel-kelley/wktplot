@@ -1,0 +1,25 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install libigraph-dev
+        sudo apt-get install libplot-dev
+        sudo apt-get install libgeos-dev
+    - name: make
+      run: make
+    - name: make check
+      run: make check
