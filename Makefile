@@ -127,7 +127,7 @@ test: $(PROG)
 	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX hull.wkt
 
-check:
+check: $(PROG)
 	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
 	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
 	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
