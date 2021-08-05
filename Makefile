@@ -106,12 +106,17 @@ $(SHLIBRARY_VER): $(WKTLIB_OBJ)
 	$(CC) -shared -Wl,-soname,$@ -o $@ $(LDFLAGS) $(WKTLIB_LDLIBS) $(WKTLIB_OBJ)
 
 install: $(PROG) $(SHLIBRARY) $(LIBRARY)
+	install -p -m 755 wkt.h $(PREFIX)/include
 	install -p -m 755 $(PROG) $(PREFIX)/bin
 	install -p -m 644 $(SHLIBRARY_VER) $(LIBRARY) $(PREFIX)/lib
 	ln -sf -r $(PREFIX)/lib/$(SHLIBRARY_VER) $(PREFIX)/lib/$(SHLIBRARY)
 
 uninstall:
 	-rm -f $(PREFIX)/bin/wktplot
+	-rm -f $(PREFIX)/include/wkt.h
+	-rm -f $(PREFIX)/lib/$(SHLIBRARY)
+	-rm -f $(PREFIX)/lib/$(SHLIBRARY_VER)
+	-rm -f $(PREFIX)/lib/$(LIBRARY)
 
 test: $(PROG)
 	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
