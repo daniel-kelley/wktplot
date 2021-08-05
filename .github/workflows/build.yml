@@ -24,7 +24,7 @@ jobs:
     - name: make check
       run: make check
     - name: make install
-      run: make install
+      run: sudo make install
     - name: make test-install
       run: |
         find /usr/local -name "*wkt*" -print
@@ -34,7 +34,7 @@ jobs:
         test -f /usr/local/lib/libwkt-0.1.so
         test -f /usr/local/lib/libwkt.a
     - name: make uninstall
-      run: make uninstall
+      run: sudo make uninstall
     - name: make test-uninstall
       run: |
         find /usr/local -name "*wkt*"  -print
