@@ -8,6 +8,10 @@
 #ifndef   _WKT_H_
 #define   _WKT_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <geos_c.h>
 
 typedef enum {
@@ -63,5 +67,9 @@ extern int wkt_stash(
     const char *file,
     const char *data,
     size_t len);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif /* _WKT_H_ */
