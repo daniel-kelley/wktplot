@@ -119,7 +119,7 @@ uninstall:
 	-rm -f $(PREFIX)/lib/$(LIBRARY)
 
 rr.wkt: wktrand
-	LD_LIBRARY_PATH=. $< -u -q 0.5 -n 8 -x 10 -y 10 $@
+	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 $@
 
 del.wkt: rr.wkt wktdel
 	LD_LIBRARY_PATH=. ./wktdel $< $@
