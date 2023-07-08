@@ -22,11 +22,20 @@
 #endif
 #endif
 
+#ifndef MARKER_SIZE_DEFAULT
+#define MARKER_SIZE_DEFAULT 10
+#endif
+
 struct info {
     int verbose;
     double width;
     const char *pen;
     const char *format;
+    struct {
+        int valid;
+        int symbol;
+        double size;
+    } marker;
     int has_color;
     int polygon_idx;
     igraph_t color;
@@ -54,7 +63,12 @@ static int w_point_iterator(
     if (info->verbose) {
         fprintf(stderr, "Point %u/%u [%g,%g]\n", i, n, x, y);
     }
-    pl_fpoint_r(info->plotter, x, y);
+    if (info->marker.valid) {
+        pl_fmarker_r(info->plotter,
+                     x, y, info->marker.symbol, info->marker.size);
+    } else {
+        pl_fpoint_r(info->plotter, x, y);
+    }
 
     return 0;
 }
@@ -317,6 +331,50 @@ static int set_option(struct info *info, const char *arg)
     return err;
 }
 
+static int set_point_format(struct info *info, const char *arg)
+{
+    int err = 1;
+    char *opt;
+    char *val;
+    char *endp;
+
+    opt = strdup(arg);
+    assert(opt != NULL);
+    val = strchr(opt, ',');
+    if (val) {
+        *val++ = 0;
+    }
+
+    do {
+        errno = 0;
+        info->marker.symbol = strtol(opt, &endp, 0);
+        if (errno || *endp != 0) {
+            /* Some kind of conversion error. */
+            break;
+        }
+        info->marker.size = MARKER_SIZE_DEFAULT;
+        if (val) {
+            info->marker.size = strtod(val, &endp);
+            if (errno || *endp != 0) {
+                /* Some kind of conversion error. */
+                break;
+            }
+        }
+
+        info->marker.valid = 1;
+        err = 0;
+
+    } while (0);
+
+    if (err) {
+        fprintf(stderr, "Error converting %s\n",arg);
+    }
+
+    free(opt);
+
+    return err;
+}
+
 static int color_read(struct info *info, const char *filename)
 {
     int err = 1;
@@ -344,9 +402,10 @@ static void color_cleanup(struct info *info)
 
 static void usage(const char *prog)
 {
-    fprintf(stderr,"%s -T format -O opt [-bBvh] <input>\n", prog);
+    fprintf(stderr,"%s -T format -O opt -p fmt [-bBvh] <input>\n", prog);
     fprintf(stderr,"  -h        Print this message\n");
     fprintf(stderr,"  -w n      Line width\n");
+    fprintf(stderr,"  -p n[,m]  Points are marker n size m\n");
     fprintf(stderr,"  -T format Output format\n");
     fprintf(stderr,"  -c gml    Read color GML file\n");
     fprintf(stderr,"  -b        Input is WKB\n");
@@ -369,7 +428,7 @@ int main(int argc, char *argv[])
     info.format = "svg";
     assert(info.param != NULL);
 
-    while ((c = getopt(argc, argv, "w:T:O:c:bBvh")) != EOF) {
+    while ((c = getopt(argc, argv, "w:T:O:c:p:bBvh")) != EOF) {
         switch (c) {
         case 'w':
             info.width = strtod(optarg,0);
@@ -382,6 +441,9 @@ int main(int argc, char *argv[])
             break;
         case 'O':
             set_option(&info, optarg);
+            break;
+        case 'p':
+            set_point_format(&info, optarg);
             break;
         case 'b':
             info.wkt.reader = WKT_IO_BINARY;

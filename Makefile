@@ -133,13 +133,15 @@ hull.wkt: rr.wkt wkthull
 ring.wkt: rr.wkt wkthull
 	LD_LIBRARY_PATH=. ./wkthull -r $< $@
 
-test: $(PROG) del.wkt vor.wkt hull.wkt ring.wkt
+test: $(PROG) rr.wkt del.wkt vor.wkt hull.wkt ring.wkt
+	LD_LIBRARY_PATH=. ./wktplot -TX -p5,0.9 rr.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX del.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX hull.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX ring.wkt
 
-check: $(PROG) del.wkt vor.wkt hull.wkt ring.wkt
+check: $(PROG) rr.wkt del.wkt vor.wkt hull.wkt ring.wkt
+	LD_LIBRARY_PATH=. ./wktplot -Tsvg -p5,0.9 rr.wkt > rr.svg
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg del.wkt > del.svg
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg vor.wkt > vor.svg
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg hull.wkt > hull.svg
@@ -147,13 +149,14 @@ check: $(PROG) del.wkt vor.wkt hull.wkt ring.wkt
 #
 # libplot is a bit leaky, but svg and X plotter is leakier than ps
 #
-valgrind-test: $(PROG)
+valgrind-test: $(PROG) rr.wkt del.wkt vor.wkt hull.wkt ring.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktdel rr.wkt del.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktvor rr.wkt vor.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wkthull rr.wkt hull.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wkthull -r rr.wkt ring.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktplot -Tps del.wkt > /dev/null
+	LD_LIBRARY_PATH=. $(VG) ./wktplot -Tps -p5,0.9 rr.wkt > /dev/null
 
 clean:
 	-rm -f $(PROG) $(SHLIBRARY) $(SHLIBRARY_VER) $(LIBRARY) \
