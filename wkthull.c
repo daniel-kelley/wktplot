@@ -15,6 +15,8 @@
 
 struct info {
     int verbose;
+    int show_ring;
+    const GEOSGeometry *ring;
     GEOSGeometry *geom;
     struct wkt wkt;
 };
@@ -26,6 +28,14 @@ static int w_hull(struct info *info)
         info->wkt.geom);
 
     assert(info->geom != NULL);
+
+    if (info->show_ring) {
+        info->ring = GEOSGetExteriorRing_r(
+            info->wkt.handle,
+            info->geom);
+
+        assert(info->ring);
+    }
 
     return 0;
 }
@@ -49,7 +59,8 @@ static int w_op(struct info *info, const char *input, const char *output)
         err = w_hull(info);
     }
     if (!err) {
-        err = wkt_write(&info->wkt, output, info->geom);
+        const GEOSGeometry *g = (info->show_ring) ? info->ring : info->geom;
+        err = wkt_write(&info->wkt, output, g);
         w_free(info);
     }
     wkt_close(&info->wkt);
@@ -65,6 +76,7 @@ static void usage(const char *prog)
         prog);
     fprintf(stderr,"  -h        Print this message\n");
     fprintf(stderr,"  -v        Verbose messages\n");
+    fprintf(stderr,"  -r        Generate Linear Ring\n");
     fprintf(stderr,"  -b        WKB IO\n");
     fprintf(stderr,"  -B        WKB HEX IO\n");
 }
@@ -80,10 +92,13 @@ int main(int argc, char *argv[])
     info.wkt.reader = WKT_IO_ASCII;
     info.wkt.writer = WKT_IO_ASCII;
 
-    while ((c = getopt(argc, argv, "Bbevh")) != EOF) {
+    while ((c = getopt(argc, argv, "Bbervh")) != EOF) {
         switch (c) {
         case 'v':
             info.verbose = 1;
+            break;
+        case 'r':
+            info.show_ring = 1;
             break;
         case 'b':
             info.wkt.reader = WKT_IO_BINARY;

@@ -183,6 +183,8 @@ static int w_handle(struct wkt *wkt,
         err = w_handle_polygon(info, geom);
     } else if (!strcmp(gtype, "LineString")) {
         err = w_handle_linestring(info, geom);
+    } else if (!strcmp(gtype, "LinearRing")) {
+        err = w_handle_linestring(info, geom);
     } else {
         fprintf(stderr,"Missing handler for %s\n", gtype);
     }
