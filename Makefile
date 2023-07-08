@@ -118,20 +118,28 @@ uninstall:
 	-rm -f $(PREFIX)/lib/$(SHLIBRARY_VER)
 	-rm -f $(PREFIX)/lib/$(LIBRARY)
 
-test: $(PROG)
-	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
-	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
-	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
-	LD_LIBRARY_PATH=. ./wkthull rr.wkt hull.wkt
+rr.wkt: wktrand
+	LD_LIBRARY_PATH=. $< -u -q 0.5 -n 8 -x 10 -y 10 $@
+
+del.wkt: rr.wkt wktdel
+	LD_LIBRARY_PATH=. ./wktdel $< $@
+
+vor.wkt: rr.wkt wktvor
+	LD_LIBRARY_PATH=. ./wktvor $< $@
+
+hull.wkt: rr.wkt wkthull
+	LD_LIBRARY_PATH=. ./wkthull $< $@
+
+ring.wkt: rr.wkt wkthull
+	LD_LIBRARY_PATH=. ./wkthull -r $< $@
+
+test: $(PROG) del.wkt vor.wkt hull.wkt ring.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX del.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX vor.wkt
 	LD_LIBRARY_PATH=. ./wktplot -TX hull.wkt
+	LD_LIBRARY_PATH=. ./wktplot -TX ring.wkt
 
-check: $(PROG)
-	LD_LIBRARY_PATH=. ./wktrand -u -q 0.5 -n 8 -x 10 -y 10 rr.wkt
-	LD_LIBRARY_PATH=. ./wktdel rr.wkt del.wkt
-	LD_LIBRARY_PATH=. ./wktvor rr.wkt vor.wkt
-	LD_LIBRARY_PATH=. ./wkthull rr.wkt hull.wkt
+check: $(PROG) del.wkt vor.wkt hull.wkt ring.wkt
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg del.wkt > del.svg
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg vor.wkt > vor.svg
 	LD_LIBRARY_PATH=. ./wktplot -Tsvg hull.wkt > hull.svg
@@ -144,9 +152,11 @@ valgrind-test: $(PROG)
 	LD_LIBRARY_PATH=. $(VG) ./wktdel rr.wkt del.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktvor rr.wkt vor.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wkthull rr.wkt hull.wkt
+	LD_LIBRARY_PATH=. $(VG) ./wkthull -r rr.wkt ring.wkt
 	LD_LIBRARY_PATH=. $(VG) ./wktplot -Tps del.wkt > /dev/null
 
 clean:
-	-rm -f $(PROG) $(SHLIBRARY) $(SHLIBRARY_VER) $(LIBRARY) $(OBJ) $(DEP)
+	-rm -f $(PROG) $(SHLIBRARY) $(SHLIBRARY_VER) $(LIBRARY) \
+		$(OBJ) $(DEP) *.wkt *.svg *.ps
 
 -include $(DEP)
